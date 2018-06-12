@@ -3,7 +3,7 @@ package db
 import (
 
 	// This line is must for working MySQL database
-
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
 
 	"github.com/medalon/stats_from_nginx/config"
@@ -28,25 +28,24 @@ func NewMySQL(c *config.StatsNginxConfig) (*MySQL, error) {
 }
 
 // CreatePreroll creates preroll entry in database
-func (m *MySQL) CreatePreroll(s model.Preroll) (model.Preroll, error) {
+func (m *MySQL) CreatePreroll(s model.Preroll) (int64, error) {
 	res, err := m.conn.Exec(
-		"INSERT INTO `preroll` (`name`, `date`, `showcnt_kg`, `showcnt_db`, `clickcnt_kg`, `clickcnt_db`) VALUES (?, ?, ?)", s.Name, s.Date, s.ShowcntKg, s.ShowcntDb, s.ClickcntKg, s.ClickcntDb,
+		"INSERT INTO `preroll` (`name`, `date`, `showcnt_kg`, `showcnt_db`, `clickcnt_kg`, `clickcnt_db`) VALUES (?, ?, ?, ?, ?, ?)", s.Name, s.Date, s.ShowcntKg, s.ShowcntDb, s.ClickcntKg, s.ClickcntDb,
 	)
 	if err != nil {
-		return s, err
+		return 0, err
 	}
 	id, err := res.LastInsertId()
 	if err != nil {
-		return s, err
+		return 0, err
 	}
-	s.ID = id
-	return s, nil
+	return id, nil
 }
 
 // SelectPreroll selects preroll entry from database
-func (m *MySQL) SelectPreroll(id int64) (model.Preroll, error) {
+func (m *MySQL) SelectPreroll(p model.Preroll) (model.Preroll, error) {
 	var s model.Preroll
-	err := m.conn.Get(&s, "SELECT * FROM `preroll` WHERE id=?", id)
+	err := m.conn.Get(&s, "SELECT `id`, `showcnt_kg`, `showcnt_db`, `clickcnt_kg`, `clickcnt_db` FROM `preroll` WHERE `name`=? AND `date`=?", p.Name, p.Date)
 	return s, err
 }
 
@@ -58,7 +57,7 @@ func (m *MySQL) ListPrerolls() ([]model.Preroll, error) {
 }
 
 // UpdatePreroll updates preroll entry in database
-func (m *MySQL) UpdatePreroll(s model.Preroll) (model.Preroll, error) {
+func (m *MySQL) UpdatePreroll(s model.Preroll) error {
 	tx := m.conn.MustBegin()
 	tx.MustExec(
 		"UPDATE `preroll` SET `name` = ?, `date` = ?, `showcnt_kg` = ?, `showcnt_db` = ?, `clickcnt_kg` = ?, `clickcnt_db` = ? WHERE `id` = ?",
@@ -67,11 +66,10 @@ func (m *MySQL) UpdatePreroll(s model.Preroll) (model.Preroll, error) {
 	err := tx.Commit()
 
 	if err != nil {
-		return s, err
+		return err
 	}
-	var i model.Preroll
-	err = m.conn.Get(&i, "SELECT * FROM `preroll` WHERE id=?", s.ID)
-	return i, err
+
+	return nil
 }
 
 // DeletePreroll deletes preroll entry from database
