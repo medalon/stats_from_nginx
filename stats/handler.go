@@ -93,36 +93,53 @@ func ParseLogFile(logReader, nginxConfig io.Reader, format string) (model.ResMap
 }
 
 // WriteToDb ...
-func (s *ServerDB) WriteToDb(name, dtime string, shcnt, clcnt int) {
+func (s *ServerDB) WriteToDb(name, dtime string, shcnt, clcnt int, geo int) error {
 	t1, _ := time.Parse("02/Jan/2006", dtime)
 	dtime = gostrftime.Format("%Y-%m-%d", t1)
 
 	var u model.Preroll
 	u.Name = name
 	u.Date = dtime
-	u.ShowcntDb = 0
-	u.ClickcntDb = 0
 
 	stmt, err := s.db.SelectPreroll(u)
 	switch {
 	case err == sql.ErrNoRows:
-		u.ShowcntKg = int64(shcnt)
-		u.ClickcntKg = int64(clcnt)
+		if geo == 1 {
+			u.ShowcntKg = int64(shcnt)
+			u.ClickcntKg = int64(clcnt)
+			u.ShowcntDb = 0
+			u.ClickcntDb = 0
+		} else {
+			u.ShowcntDb = int64(shcnt)
+			u.ClickcntDb = int64(clcnt)
+			u.ShowcntKg = 0
+			u.ClickcntKg = 0
+		}
 		_, err := s.db.CreatePreroll(u)
 		if err != nil {
 			fmt.Println(err)
 		}
 	case err != nil:
-		fmt.Println(err)
+		return err
 
 	case stmt.ID > 0:
-		u.ShowcntKg = stmt.ShowcntKg + int64(shcnt)
-		u.ClickcntKg = stmt.ClickcntKg + int64(clcnt)
+		if geo == 1 {
+			u.ShowcntKg = stmt.ShowcntKg + int64(shcnt)
+			u.ClickcntKg = stmt.ClickcntKg + int64(clcnt)
+			u.ShowcntDb = stmt.ShowcntDb
+			u.ClickcntDb = stmt.ClickcntDb
+		} else {
+			u.ShowcntDb = stmt.ShowcntDb + int64(shcnt)
+			u.ClickcntDb = stmt.ClickcntDb + int64(clcnt)
+			u.ShowcntKg = stmt.ShowcntKg
+			u.ClickcntKg = stmt.ClickcntKg
+		}
 		u.ID = stmt.ID
 		err := s.db.UpdatePreroll(u)
 		if err != nil {
-			fmt.Println(err)
+			return err
 		}
-		fmt.Println("updated")
 	}
+
+	return nil
 }

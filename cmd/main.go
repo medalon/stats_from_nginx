@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -13,8 +14,17 @@ import (
 
 var format = "main"
 var logFile string
+var mesto string
+var geo int
+
+func init() {
+	flag.StringVar(&logFile, "log", "dummy", "Log file name to read. Read from STDIN if file name is '-'")
+	flag.StringVar(&mesto, "mesto", "kg", "Default value")
+}
 
 func main() {
+	flag.Parse()
+
 	// Read config from system environment
 	c, err := config.GetConfig()
 	if err != nil {
@@ -23,7 +33,6 @@ func main() {
 
 	// Read given file or from STDIN
 	var logReader io.Reader
-	logFile = "dummy"
 
 	if logFile == "dummy" {
 		logReader = strings.NewReader(`1.2.3.4 - - [18/Feb/2018:16:54:10 +0600] "GET /1px.png?stat=preroll&name=PACMAN&act=click&pid=bQFrkd9E HTTP/1.1" 200 923 "https://localhost/embed/video/183223?mesto=1&ismobile=1" "Mozilla/5.0 (Linux; Android 6.0.1; SM-G532F Build/MMB29T) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.87 Mobile Safari/537.36" "-"
@@ -51,18 +60,23 @@ func main() {
 	if err != nil {
 		fmt.Println(err)
 	}
-	fmt.Println(testRes)
 
 	s, err := stats.NewServerDB(c)
 	if err != nil {
 		fmt.Println(err)
 	}
 
+	if mesto == "kg" {
+		geo = 1
+	} else {
+		geo = 0
+	}
 	for k, v := range testRes {
 		for i, j := range v {
 			//fmt.Printf("%s => %s = %v, %v\n", k, i, j.Showcnt, j.Clickcnt)
-			s.WriteToDb(k, i, j.Showcnt, j.Clickcnt)
+			_ = s.WriteToDb(k, i, j.Showcnt, j.Clickcnt, geo)
 
 		}
 	}
+	fmt.Println("All Done!")
 }
